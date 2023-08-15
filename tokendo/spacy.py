@@ -1,8 +1,9 @@
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Union
 
 import spacy
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer
+from spacy.language import Language
 from spacy.matcher import Matcher
 from spacy.tokens import Doc, Token
 
@@ -28,12 +29,20 @@ ATTRIBUTES = {
 class SpacyTokenizer(BaseEstimator, TransformerMixin):
     def __init__(
         self,
-        model: str = "en_core_web_sm",
+        model: Union[str, Language] = "en_core_web_sm",
         patterns: Optional[list[list[dict[str, Any]]]] = None,
         out_attrs: Iterable[str] = ("NORM",),
     ):
         self.model = model
-        self.nlp = spacy.load(model)
+        if isinstance(model, Language):
+            self.nlp = model
+        elif isinstance(model, str):
+            self.nlp = spacy.load(model)
+        else:
+            raise TypeError(
+                "'model' either has to be a spaCy"
+                "nlp object or the name of a model."
+            )
         if patterns is not None:
             self.patterns = patterns
         else:
@@ -86,7 +95,7 @@ class SpacyTokenizer(BaseEstimator, TransformerMixin):
 class SpacyVectorizer(CountVectorizer):
     def __init__(
         self,
-        model: str = "en_core_web_sm",
+        model: Union[str, Language] = "en_core_web_sm",
         patterns: Optional[list[list[dict[str, Any]]]] = None,
         out_attrs: Iterable[str] = ("NORM",),
         ngram_range: tuple[int, int] = (1, 1),

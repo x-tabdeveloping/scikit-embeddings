@@ -1,6 +1,6 @@
 import random
 from collections import Counter
-from typing import Iterable, Union
+from typing import Iterable, Optional, Union
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -27,6 +27,9 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         Tuple of lower and upper frequency values.
         Frequency is learned from the data and is determined on the document
         level.
+    max_features: int, default None
+        Maximum number of unqique tokens to pass down the pipeline.
+        If None, all tokens are allowed to pass.
     max_memory: int, default 5000
         Maximum size of the reservoir sampled token length pool.
         This is what the lenght quantiles are calculated from.
@@ -41,6 +44,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
             None,
         ),
         frequency_range: tuple[float, float] = (0.0, 1.0),
+        max_features: Optional[int] = None,
         max_memory: int = 5000,
     ):
         self.negative = set(negative)
@@ -70,6 +74,8 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         self.seen_lengths = 0
         self.max_memory = max_memory
         self.frequencies = Counter()
+        self.max_features = max_features
+        self.most_common = None
 
     def append_reservoir(self, token: str):
         """Adds token length to the pool with reservoir sampling."""
@@ -117,6 +123,12 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         if self.min_length_quantile:
             self.min_length = np.quantile(self.length_pool, self.minl)  # type: ignore
         self.frequencies.update(tokens)
+        if self.max_features is not None:
+            most_common_tokens = [
+                token
+                for token, _ in self.frequencies.most_common(self.max_features)
+            ]
+            self.most_common = set(most_common_tokens)
         return self
 
     def passes(self, token: str) -> bool:
@@ -133,11 +145,15 @@ class TokenFilter(TransformerMixin, BaseEstimator):
         freq_pass: bool = (token_frequency >= self.frequency_range[0]) and (
             token_frequency <= self.frequency_range[1]
         )
+        is_in_most_common = (self.most_common is None) or (
+            token in self.most_common
+        )
         return (
             (token not in self.negative)
             and max_pass
             and min_pass
             and freq_pass
+            and is_in_most_common
         )
 
     def transform(self, X: list[list[str]]) -> list[list[str]]:

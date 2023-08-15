@@ -43,16 +43,16 @@ class SpacyTokenizer(BaseEstimator, TransformerMixin):
                 "'model' either has to be a spaCy"
                 "nlp object or the name of a model."
             )
-        if patterns is not None:
-            self.patterns = patterns
-        else:
-            self.patterns = ALPHA_STOP_PATTERN
+        self.patterns = patterns
         self.out_attrs = tuple(out_attrs)
         for attr in self.out_attrs:
             if attr not in ATTRIBUTES:
                 raise ValueError(f"{attr} is not a valid out attribute.")
         self.matcher = Matcher(self.nlp.vocab)
-        self.matcher.add("FILTER_PASS", patterns=self.patterns)
+        self.matcher.add(
+            "FILTER_PASS",
+            patterns=[] if self.patterns is None else self.patterns,
+        )
 
     def fit(self, X, y=None):
         """Exists for compatiblity, doesn't do anything."""
@@ -65,7 +65,10 @@ class SpacyTokenizer(BaseEstimator, TransformerMixin):
     def label_matching_tokens(self, docs: list[Doc]):
         """Labels tokens that match one of the given patterns."""
         for doc in docs:
-            matches = self.matcher(doc)
+            if self.patterns is not None:
+                matches = self.matcher(doc)
+            else:
+                matches = [(None, 0, len(doc))]
             for _, start, end in matches:
                 for token in doc[start:end]:
                     token._.set("filter_pass", True)

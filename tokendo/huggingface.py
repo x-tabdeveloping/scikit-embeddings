@@ -26,6 +26,9 @@ class HuggingFaceTokenizer(BaseEstimator, TransformerMixin):
             res.append(self.tokenizer.tokenize(text))
         return res
 
+    def get_feature_names_out(self, input_features=None):
+        return None
+
 
 class HuggingFaceVectorizer(CountVectorizer):
     def __init__(

@@ -32,7 +32,7 @@ class ListCountVectorizer(TransformerMixin, BaseEstimator):
 
             return pd.DataFrame(X_new, columns=self.get_feature_names_out())  # type: ignore
 
-    def get_feature_names_out(self):
+    def get_feature_names_out(self, input_features=None):
         return self.dict_vectorizer.get_feature_names_out()
 
     def set_output(self, transform=None):

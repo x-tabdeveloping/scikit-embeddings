@@ -95,6 +95,9 @@ class SpacyTokenizer(BaseEstimator, TransformerMixin):
             res.append(tokens)
         return res
 
+    def get_feature_names_out(self, input_features=None):
+        return None
+
 
 class SpacyVectorizer(CountVectorizer):
     def __init__(

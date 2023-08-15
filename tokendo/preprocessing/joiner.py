@@ -21,3 +21,6 @@ class Joiner(BaseEstimator, TransformerMixin):
     def transform(self, X: Iterable[list[str]]) -> Iterable[str]:
         for doc in X:
             yield self.sep.join(doc)
+
+    def get_feature_names_out(self, input_features=None):
+        return None

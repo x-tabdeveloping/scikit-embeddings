@@ -159,3 +159,6 @@ class TokenFilter(TransformerMixin, BaseEstimator):
             res_tokens = [token for token in doc if self.passes(token)]
             res.append(res_tokens)
         return res
+
+    def get_feature_names_out(self, input_features=None):
+        return None

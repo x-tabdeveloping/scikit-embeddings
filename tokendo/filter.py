@@ -122,7 +122,7 @@ class TokenFilter(TransformerMixin, BaseEstimator):
     def passes(self, token: str) -> bool:
         """Determines whether a token passes the filter or not."""
         token_length = len(token)
-        total_freq = sum(self.frequencies.values())
+        total_freq = self.frequencies.total()
         token_frequency = 0
         if total_freq:
             token_frequency = self.frequencies.get(token, 0) / total_freq

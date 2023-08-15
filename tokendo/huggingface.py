@@ -17,6 +17,10 @@ class HuggingFaceTokenizer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X: Iterable[str]) -> list[list[str]]:
+        if isinstance(X, str):
+            raise TypeError(
+                "str passed instead of iterable, did you mean to pass [X]?"
+            )
         res = []
         for text in X:
             res.append(self.tokenizer.tokenize(text))

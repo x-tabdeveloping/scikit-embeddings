@@ -78,6 +78,10 @@ class SpacyTokenizer(BaseEstimator, TransformerMixin):
         return "|".join(attributes)
 
     def transform(self, X: Iterable[str]) -> list[list[str]]:
+        if isinstance(X, str):
+            raise TypeError(
+                "str passed instead of iterable, did you mean to pass [X]?"
+            )
         docs = list(self.nlp.pipe(X))
         # Label all tokens according to the patterns.
         self.label_matching_tokens(docs)

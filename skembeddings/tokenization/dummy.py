@@ -44,13 +44,14 @@ class DummyTokenizer(TransformerMixin, BaseEstimator):
         remove_digits: bool = True,
         remove_punctuation: bool = True,
         n_jobs: int = 1,
-        chunkize: int = 100,
+        chunksize: int = 100,
     ):
+        self.stop_words = stop_words
         self.lowercase = lowercase
         self.remove_digits = remove_digits
         self.remove_punctuation = remove_punctuation
         self.n_jobs = n_jobs
-        self.chunksize = chunkize
+        self.chunksize = chunksize
         if isinstance(stop_words, str):
             lang = stop_words
             self.stop_word_set = importlib.import_module(

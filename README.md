@@ -1,2 +1,2 @@
-# tokendo
-Tokenizer components for scikit-learn pipelines.
+# scikit-embeddings
+Utilites for training word and document embeddings in scikit-learn pipelines.

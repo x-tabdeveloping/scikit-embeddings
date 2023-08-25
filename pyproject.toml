@@ -1,2 +1,26 @@
 [tool.black]
 line-length=79
+
+[tool.poetry]
+name = "scikit-embeddings"
+version = "0.1.0"
+description = "Tools for training word and document embeddings in scikit-learn."
+authors = ["Márton Kardos <power.up1163@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+scikit-learn = "^1.2.0"
+transformers = { version = "^4.25.0", optional = true }
+spacy = { version = "3.5.0", optional = true }
+gensim = { version = "4.3.0", optional = true }
+
+[tool.poetry.extras]
+transformers = ["transformers"]
+spacy = ["spacy"]
+gensim = ["gensim"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -54,9 +54,15 @@ class DummyTokenizer(TransformerMixin, BaseEstimator):
         self.chunksize = chunksize
         if isinstance(stop_words, str):
             lang = stop_words
-            self.stop_word_set = importlib.import_module(
-                f"spacy.lang.{lang}.stop_words"
-            ).STOP_WORDS
+            try:
+                self.stop_word_set = importlib.import_module(
+                    f"spacy.lang.{lang}.stop_words"
+                ).STOP_WORDS
+            except ModuleNotFoundError as e:
+                raise ModuleNotFoundError(
+                    "You have to install spaCy to use its"
+                    "stop words in DummyTokenizer"
+                ) from e
         elif stop_words is None:
             self.stop_word_set = set()
         else:

@@ -108,7 +108,12 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
     def _collect_vectors_single(self, tokens: list[str]) -> np.ndarray:
         embeddings = []
         for token in tokens:
-            embeddings.append(self.model_.wv[token])  # type: ignore
+            try:
+                embeddings.append(self.model_.wv[token])  # type: ignore
+            except KeyError:
+                continue
+        if not embeddings:
+            return np.full(self.n_features_out, np.nan)
         return np.stack(embeddings)
 
     def transform(self, X: Iterable[Iterable[str]], y=None):

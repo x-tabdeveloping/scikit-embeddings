@@ -39,7 +39,7 @@ class DummyTokenizer(TransformerMixin, BaseEstimator):
 
     def __init__(
         self,
-        stop_words: Union[str, list[str], None],
+        stop_words: Union[str, list[str], None] = None,
         lowercase: bool = True,
         remove_digits: bool = True,
         remove_punctuation: bool = True,

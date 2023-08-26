@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import Iterable, Literal, Union
 
 import numpy as np
-from gensim.models import Word2Vec
+from gensim.models import KeyedVectors, Word2Vec
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.exceptions import NotFittedError
 
 from skembeddings.streams.utils import deeplist
 
@@ -137,6 +138,14 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
                     (mean_vector, max_vector)
                 )
         return embeddings
+
+    @property
+    def keyed_vectors(self) -> KeyedVectors:
+        if self.model_ is None:
+            raise NotFittedError(
+                "Can't access keyed vectors, model has not been fitted yet."
+            )
+        return self.model_.wv
 
     @classmethod
     def from_pretrained(

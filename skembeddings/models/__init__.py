@@ -6,8 +6,8 @@ except ModuleNotFoundError:
     Word2VecEmbedding = NotInstalled("Word2VecEmbedding", "gensim")
 
 try:
-    from skembeddings.models.doc2vec import Doc2VecEmbedding
+    from skembeddings.models.doc2vec import ParagraphEmbedding
 except ModuleNotFoundError:
-    Doc2VecEmbedding = NotInstalled("Doc2VecEmbedding", "gensim")
+    ParagraphEmbedding = NotInstalled("ParagraphEmbedding", "gensim")
 
-__all__ = ["Word2VecEmbedding", "Doc2VecEmbedding"]
+__all__ = ["Word2VecEmbedding", "ParagraphEmbedding"]

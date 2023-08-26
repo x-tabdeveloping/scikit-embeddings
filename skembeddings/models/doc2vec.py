@@ -14,7 +14,7 @@ def _tag_enumerate(docs: Iterable[list[str]]) -> list[TaggedDocument]:
     return [TaggedDocument(doc, [i]) for i, doc in enumerate(docs)]
 
 
-class Doc2VecEmbedding(BaseEstimator, TransformerMixin):
+class ParagraphEmbedding(BaseEstimator, TransformerMixin):
     """Scikit-learn compatible Doc2Vec model."""
 
     def __init__(

@@ -5,27 +5,35 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 from tokenizers import Tokenizer
 from tokenizers.normalizers import BertNormalizer, Normalizer
+from tokenizers.trainers import Trainer
 
 
 class HuggingFaceTokenizerBase(BaseEstimator, TransformerMixin, ABC):
     def __init__(self, normalizer: Normalizer = BertNormalizer()):
         self.tokenizer = None
+        self.trainer = None
         self.normalizer = normalizer
 
     @abstractmethod
     def _init_tokenizer(self) -> Tokenizer:
         pass
 
+    @abstractmethod
+    def _init_trainer(self) -> Trainer:
+        pass
+
     def fit(self, X: Iterable[str], y=None):
         self.tokenizer = self._init_tokenizer()
-        self.tokenizer.train_from_iterator(X)
+        self.trainer = self._init_trainer()
+        self.tokenizer.train_from_iterator(X, self.trainer)
         return self
 
     def partial_fit(self, X: Iterable[str], y=None):
-        if self.tokenizer is None:
+        if (self.tokenizer is None) or (self.trainer is None):
             self.fit(X)
         else:
             new_tokenizer = self._init_tokenizer()
+            new_tokenizer.train_from_iterator(X, self.trainer)
             new_vocab = new_tokenizer.get_vocab()
             self.tokenizer.add_tokens(new_vocab)
         return self

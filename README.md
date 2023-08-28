@@ -1,7 +1,5 @@
 # scikit-embeddings
-Utilites for training word and document embeddings in scikit-learn pipelines.
-
-This is a module that is currently in development and experimental phase, DO NOT use it for production code.
+Utilites for training word, document and sentence embeddings in scikit-learn pipelines.
 
 ## Features
  - Train Word, Paragraph or Sentence embeddings in scikit-learn compatible pipelines.
@@ -9,6 +7,11 @@ This is a module that is currently in development and experimental phase, DO NOT
  - spaCy tokenizers with lemmatization, stop word removal and augmentation with POS-tags/Morphological information etc. for highest quality embeddings for literary analysis.
  - Fast and performant trainable tokenizer components from `tokenizers`.
  - Easy to integrate components and pipelines in your scikit-learn workflows and machine learning pipelines.
+
+### What scikit-embeddings is not for:
+ - Using pretrained embeddings in scikit-learn pipelines (for these purposes I recommend [embetter](https://github.com/koaning/embetter/tree/main))
+ - Training transformer models and deep neural language models (if you want to do this, do it with [transformers](https://huggingface.co/docs/transformers/index))
+
 
 ## Examples
 

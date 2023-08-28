@@ -3,6 +3,9 @@ line-length=79
 
 [tool.poetry]
 name = "scikit-embeddings"
+packages = [
+  {include = "skembeddings"}
+]
 version = "0.1.0"
 description = "Tools for training word and document embeddings in scikit-learn."
 authors = ["Márton Kardos <power.up1163@gmail.com>"]

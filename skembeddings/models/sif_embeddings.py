@@ -17,49 +17,17 @@ from skembeddings.streams.utils import deeplist
 class SIFEmbedding(BaseEstimator, TransformerMixin):
     def __init__(
         self,
-        word_vectors: Union[str, KeyedVectors] = "word2vec-google-news-300",
+        embedding_model: TransformerMixin,
         smoothing: float = 1.0,
     ):
-        self.word_vectors = word_vectors
+        self.embedding_model = embedding_model
         self.smoothing = smoothing
-        if isinstance(word_vectors, str):
-            if word_vectors in downloader.info()["models"]:
-                self.keyed_vectors: KeyedVectors = downloader.load(word_vectors)  # type: ignore
-            else:
-                loaded_object = SaveLoad().load(self.word_vectors)
-                if isinstance(loaded_object, KeyedVectors):
-                    self.keyed_vectors = loaded_object
-                else:
-                    raise TypeError(
-                        "Object loaded from disk is not a KeyedVectors instance."
-                    )
-        elif isinstance(word_vectors, KeyedVectors):
-            self.keyed_vectors: KeyedVectors = word_vectors
-        else:
-            raise TypeError(
-                f"You should pass a word_vectors name or keyed vectors to SIFEmbedding, not {type(word_vectors)}"
-            )
+        self.sing_vect_ = None
 
-    def _get_embedding(self, sent: list[str]) -> np.ndarray:
-        embeddings = []
-        for token in sent:
-            try:
-                emb = self.keyed_vectors[token]
-                embeddings.append(emb)
-            except KeyError:
-                embeddings.append(np.full(self.n_features_out, np.nan))
-        if not embeddings:
-            return np.full(self.n_features_out, np.nan)
-        embeddings = np.stack(embeddings)
-        freqs = np.array([self.freq_[token] / self.total_ for token in sent])
-        weighted: np.ndarray = (
-            embeddings.T * (self.smoothing / (self.smoothing + freqs))
-        ).T
-        return np.sum(weighted, axis=0) / len(sent)
-
-    def fit_transform(self, X: Iterable[Iterable[str]], y=None):
-        self.n_features_out = self.keyed_vectors.vector_size
-        X_eval: list[list[str]] = deeplist(X)
+    def fit_transform(self, X: Iterable[Iterable[str]], y=None) -> np.ndarray:
+        X_eval = deeplist(X)
+        X_trf = self.embedding_model.fit_transform(X)
+        self.n_features_out = X_trf.shape[1]
         self.freq_ = Counter()
         for sent in X_eval:
             self.freq_.update(sent)
@@ -74,6 +42,17 @@ class SIFEmbedding(BaseEstimator, TransformerMixin):
         u = self.sing_vect_
         X_new = np.stack([sent - u.T @ u @ sent for sent in sent_embeddings])
         return X_new
+
+    def _get_embedding(self, sent: list[str]) -> np.ndarray:
+        if not sent:
+            return np.full(self.n_features_out, np.nan)
+        embeddings = self.embedding_model.transform(sent)
+        embeddings = np.stack(embeddings)
+        freqs = np.array([self.freq_[token] / self.total_ for token in sent])
+        weighted: np.ndarray = (
+            embeddings.T * (self.smoothing / (self.smoothing + freqs))
+        ).T
+        return np.sum(weighted, axis=0) / len(sent)
 
     def fit(self, X: Iterable[Iterable[str]], y=None):
         self.fit_transform(X, y)

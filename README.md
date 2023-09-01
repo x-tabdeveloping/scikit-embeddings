@@ -7,15 +7,33 @@ Utilites for training word, document and sentence embeddings in scikit-learn pip
  - spaCy tokenizers with lemmatization, stop word removal and augmentation with POS-tags/Morphological information etc. for highest quality embeddings for literary analysis.
  - Fast and performant trainable tokenizer components from `tokenizers`.
  - Easy to integrate components and pipelines in your scikit-learn workflows and machine learning pipelines.
+ - Easy serialization and integration with HugginFace Hub for quickly publishing your embedding pipelines.
 
 ### What scikit-embeddings is not for:
- - Using pretrained embeddings in scikit-learn pipelines (for these purposes I recommend [embetter](https://github.com/koaning/embetter/tree/main))
  - Training transformer models and deep neural language models (if you want to do this, do it with [transformers](https://huggingface.co/docs/transformers/index))
+ - Using pretrained sentence transformers (use [embetter](https://github.com/koaning/embetter))
 
+## Installation
 
-## Examples
+You can easily install scikit-embeddings from PyPI:
 
-### Streams
+```bash
+pip install scikit-embeddings
+```
+
+If you want to use Gensim embedding models, install alogn with gensim:
+
+```bash
+pip install scikit-embeddings[gensim]
+```
+
+If you intend to use spacy tokenizers, install spacy:
+
+```bash
+pip install scikit-embeddings[spacy]
+```
+
+## Streams
 
 scikit-embeddings comes with a handful of utilities for streaming data from disk or other sources,
 chunking and filtering. Here's an example of how you would go about obtaining chunks of text from jsonl files with a "content field".
@@ -36,16 +54,20 @@ text_chunks = (
 )
 ```
 
+## Example Pipelines
+
+You can use scikit-embeddings with many many different pipeline architectures, I will list a few here:
+
 ### Word Embeddings
 
 You can train classic vanilla word embeddings by building a pipeline that contains a `WordLevel` tokenizer and an embedding model:
 
 ```python
-from sklearn.pipelines import make_pipeline
 from skembedding.tokenizers import WordLevelTokenizer
 from skembedding.models import Word2VecEmbedding
+from skembeddings.pipeline import EmbeddingPipeline
 
-embedding_pipe = make_pipeline(
+embedding_pipe = EmbeddingPipeline(
     WordLevelTokenizer(),
     Word2VecEmbedding(n_components=100, algorithm="cbow")
 )
@@ -59,11 +81,11 @@ You may want to use `Unigram`, `BPE` or `WordPiece` for these purposes.
 Fasttext also uses skip-gram by default so let's change to that.
 
 ```python
-from sklearn.pipelines import make_pipeline
 from skembedding.tokenizers import UnigramTokenizer
 from skembedding.models import Word2VecEmbedding
+from skembeddings.pipeline import EmbeddingPipeline
 
-embedding_pipe = make_pipeline(
+embedding_pipe = EmbeddingPipeline(
     UnigramTokenizer(),
     Word2VecEmbedding(n_components=250, algorithm="sg")
 )
@@ -76,10 +98,9 @@ We provide a spaCy tokenizer that can lemmatize tokens and append morphological 
 semantic information even on relatively small corpora. I recommend using this for literary analysis.
 
 ```python
-from sklearn.pipeline import make_pipeline
-
-from skembeddings.models.word2vec import Word2VecEmbedding
-from skembeddings.tokenization import SpacyTokenizer
+from skembeddings.models import Word2VecEmbedding
+from skembeddings.tokenizers import SpacyTokenizer
+from skembeddings.pipeline import EmbeddingPipeline
 
 # Single token pattern that lets alphabetical tokens pass, but not stopwords
 pattern = [[{"IS_ALPHA": True, "IS_STOP": False}]]
@@ -92,7 +113,7 @@ tokenizer = SpacyTokenizer(
 )
 
 # Build a pipeline
-embedding_pipeline = make_pipeline(
+embedding_pipeline = EmbeddingPipeline(
     tokenizer,
     Word2VecEmbedding(50, algorithm="cbow")
 )
@@ -106,31 +127,48 @@ embedding_pipeline.fit(corpus)
 You can train Doc2Vec paragpraph embeddings with the chosen choice of tokenization.
 
 ```python
-from sklearn.pipelines import make_pipeline
 from skembedding.tokenizers import WordPieceTokenizer
 from skembedding.models import ParagraphEmbedding
+from skembeddings.pipeline import EmbeddingPipeline
 
-embedding_pipe = make_pipeline(
+embedding_pipe = EmbeddingPipeline(
     WordPieceTokenizer(),
     ParagraphEmbedding(n_components=250, algorithm="dm")
 )
 embedding_pipe.fit(texts)
 ```
 
-### Iterative training
+## Iterative training
 
-In the case of large datasets you can train on individual chunks with the help of `scikit-partial`.
+In the case of large datasets you can train on individual chunks with `partial_fit()`.
 
 ```python
-from skpartial.pipeline import make_partial_pipeline
-
-pipe = make_partial_pipeline(tokenizer, embedding_model)
-
 for chunk in text_chunks:
-    pipe.partial_fit(chunk)
+    embedding_pipe.partial_fit(chunk)
 ```
 
-### Text Classification
+## Serialization
+
+Pipelines can be safely serialized to disk:
+
+```python
+embedding_pipe.to_disk("output_folder/")
+
+embedding_pipe = EmbeddingPipeline.from_disk("output_folder/")
+```
+
+Or published to HugginFace Hub:
+
+```python
+from huggingface_hub import login
+
+login()
+embedding_pipe.to_hub("username/name_of_pipeline")
+
+embedding_pipe = EmbeddingPipeline.from_hub("username/name_of_pipeline")
+```
+
+## Text Classification
 
 You can include an embedding model in your classification pipelines by adding some classification head.
 
@@ -149,7 +187,7 @@ print(classification_report(y_test, y_pred))
 ```
 
 
-### Feature Extraction
+## Feature Extraction
 
 If you intend to use the features produced by tokenizers in other text pipelines, such as topic models,
 you can use `ListCountVectorizer` or `Joiner`.

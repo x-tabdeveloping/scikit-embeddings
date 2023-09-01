@@ -6,6 +6,8 @@ from spacy.language import Language
 from spacy.matcher import Matcher
 from spacy.tokens import Doc, Token
 
+from skembeddings.base import SaveLoad
+
 # We create a new extension on tokens.
 if not Token.has_extension("filter_pass"):
     Token.set_extension("filter_pass", default=False)
@@ -23,7 +25,7 @@ ATTRIBUTES = {
 }
 
 
-class SpacyTokenizer(BaseEstimator, TransformerMixin):
+class SpacyTokenizer(BaseEstimator, TransformerMixin, SaveLoad):
     def __init__(
         self,
         model: Union[str, Language] = "en_core_web_sm",

@@ -1,3 +1,6 @@
+import io
+import json
+import tarfile
 from pathlib import Path
 from typing import Iterable, Literal, Union
 
@@ -34,7 +37,6 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
         self.n_jobs = n_jobs
         self.window = window
         self.algorithm = algorithm
-        self.model = None
         self.random_state = random_state
         self.learning_rate = learning_rate
         self.min_learning_rate = min_learning_rate
@@ -146,6 +148,36 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
                 "Can't access keyed vectors, model has not been fitted yet."
             )
         return self.model_.wv
+
+    def save(self, path: Union[str, Path]) -> None:
+        if self.model_ is None:
+            raise NotFittedError(
+                "Can't save model if it hasn't been fitted yet."
+            )
+        with tarfile.open(path, "w:gz") as out_ball:
+            model_file = io.BytesIO()
+            self.model_.save(model_file)
+            out_ball.addfile(tarfile.TarInfo("word2vec.model"), model_file)
+            config_file = io.BytesIO()
+            conf_string = json.dumps({"agg": self.agg})
+            conf_bytes = conf_string.encode("utf-8")
+            config_file.write(conf_bytes)
+            out_ball.addfile(tarfile.TarInfo("config.json"), config_file)
+
+    @classmethod
+    def load(cls, path: Union[str, Path]) -> "Word2VecEmbedding":
+        with tarfile.open(path, "r:gz") as in_ball:
+            names = set(in_ball.getnames())
+            if names != {"word2vec.model", "config.json"}:
+                raise TypeError(
+                    "Given path does not contain a serialized Word2Vec model."
+                )
+            model_file = in_ball.extractfile("word2vec.model")
+            model = Word2Vec.load(model_file)
+            config_file = in_ball.extractfile("config.json")
+            conf_bytes = config_file.read()  # type: ignore
+            config = json.loads(conf_bytes.decode("utf-8"))
+            return cls.from_pretrained(model, **config)
 
     @classmethod
     def from_pretrained(

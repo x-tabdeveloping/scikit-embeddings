@@ -1,4 +1,7 @@
-from typing import Iterable, Literal
+import io
+import tarfile
+from pathlib import Path
+from typing import Iterable, Literal, Union
 
 import numpy as np
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
@@ -182,3 +185,67 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin):
         if self.model_ is None:
             raise NotFittedError("Model has not been fitted yet.")
         return np.array(self.model_.dv.vectors).T
+
+    def save(self, path: Union[str, Path]) -> None:
+        if self.model_ is None:
+            raise NotFittedError(
+                "Can't save model if it hasn't been fitted yet."
+            )
+        with tarfile.open(path, "w:gz") as out_ball:
+            model_file = io.BytesIO()
+            self.model_.save(model_file)
+            out_ball.addfile(tarfile.TarInfo("doc2vec.model"), model_file)
+
+    @classmethod
+    def load(cls, path: Union[str, Path]) -> "ParagraphEmbedding":
+        with tarfile.open(path, "r:gz") as in_ball:
+            names = set(in_ball.getnames())
+            if names != {"doc2vec.model"}:
+                raise TypeError(
+                    "Given path does not contain a serialized Doc2Vec model."
+                )
+            model_file = in_ball.extractfile("doc2vec.model")
+            model = Doc2Vec.load(model_file)
+            return cls.from_pretrained(model)
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        model: Union[str, Path, Doc2Vec],
+    ):
+        if isinstance(model, (str, Path)):
+            model_ = Doc2Vec.load(model)
+        elif isinstance(model, Doc2Vec):
+            model_ = model
+        else:
+            raise TypeError(
+                "Pretrained model either has to be a"
+                "path or a Doc2Vec instance."
+            )
+        if model_.dm_mean:
+            dm_agg = "mean"
+        elif model_.dm_concat:
+            dm_agg = "concat"
+        else:
+            dm_agg = "sum"
+        res = cls(
+            n_components=model_.vector_size,
+            learning_rate=model_.alpha,
+            window=model_.window,
+            sample=model_.sample,
+            random_state=model_.seed,
+            n_jobs=model_.workers,
+            min_learning_rate=model_.min_alpha,
+            algorithm="dm" if model_.dm else "dbow",
+            dm_agg=dm_agg,
+            dbow_words=bool(model_.dbow_words),
+            dm_tag_count=model_.dm_tag_count,
+            hs=bool(model_.hs),
+            negative=model_.negative,
+            ns_exponent=model_.ns_exponent,
+            epochs=model_.epochs,
+            batch_words=model_.batch_words,
+            shrink_windows=model_.shrink_windows,
+        )
+        res.model_ = model_
+        return res

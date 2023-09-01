@@ -1,9 +1,13 @@
+import tempfile
 from pathlib import Path
 from typing import Union
 
 from confection import Config, registry
+from huggingface_hub import HfApi, snapshot_download
 from sklearn.pipeline import Pipeline
 
+from skembeddings import models, tokenizers
+from skembeddings._hub import DEFAULT_README
 from skembeddings.base import Serializable
 
 
@@ -87,3 +91,22 @@ class EmbeddingPipeline(Pipeline):
         with open(embedding_path, "rb") as embedding_file:
             embedding = resolved["embedding"].from_bytes(embedding_file.read())
         return cls(tokenizer, embedding)
+
+    def to_hub(self, repo_id: str, add_readme: bool = True) -> None:
+        api = HfApi()
+        api.create_repo(repo_id, exist_ok=True)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.to_disk(tmp_dir)
+            if add_readme:
+                with open(
+                    Path(tmp_dir).joinpath("README.md"), "w"
+                ) as readme_f:
+                    readme_f.write(DEFAULT_README.format(repo=repo_id))
+            api.upload_folder(
+                folder_path=tmp_dir, repo_id=repo_id, repo_type="model"
+            )
+
+    @classmethod
+    def from_hub(cls, repo_id: str) -> "EmbeddingPipeline":
+        in_dir = snapshot_download(repo_id=repo_id)
+        return cls.from_disk(in_dir)

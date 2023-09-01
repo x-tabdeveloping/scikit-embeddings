@@ -1,8 +1,12 @@
+<img align="left" width="82" height="82" src="assets/logo.svg">
+
 # scikit-embeddings
-Utilites for training word, document and sentence embeddings in scikit-learn pipelines.
+
+<br>
+Utilites for training, storing and using word and document embeddings in scikit-learn pipelines.
 
 ## Features
- - Train Word, Paragraph or Sentence embeddings in scikit-learn compatible pipelines.
+ - Train Word and Paragraph embeddings in scikit-learn compatible pipelines.
  - Stream texts easily from disk and chunk them so you can use large datasets for training embeddings.
  - spaCy tokenizers with lemmatization, stop word removal and augmentation with POS-tags/Morphological information etc. for highest quality embeddings for literary analysis.
  - Fast and performant trainable tokenizer components from `tokenizers`.

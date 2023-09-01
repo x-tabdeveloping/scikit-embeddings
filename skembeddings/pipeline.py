@@ -109,4 +109,5 @@ class EmbeddingPipeline(Pipeline):
     @classmethod
     def from_hub(cls, repo_id: str) -> "EmbeddingPipeline":
         in_dir = snapshot_download(repo_id=repo_id)
-        return cls.from_disk(in_dir)
+        res = cls.from_disk(in_dir)
+        return res.freeze()

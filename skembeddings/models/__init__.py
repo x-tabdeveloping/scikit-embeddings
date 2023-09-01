@@ -10,9 +10,5 @@ try:
 except ModuleNotFoundError:
     ParagraphEmbedding = NotInstalled("ParagraphEmbedding", "gensim")
 
-try:
-    from skembeddings.models.sif_embeddings import SIFEmbedding
-except ModuleNotFoundError:
-    SIFEmbedding = NotInstalled("SIFEmbedding", "gensim")
 
-__all__ = ["Word2VecEmbedding", "ParagraphEmbedding", "SIFEmbedding"]
+__all__ = ["Word2VecEmbedding", "ParagraphEmbedding"]

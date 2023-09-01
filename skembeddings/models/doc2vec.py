@@ -9,6 +9,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.utils import murmurhash3_32
 
+from skembeddings.base import Serializable
 from skembeddings.streams.utils import deeplist
 
 
@@ -17,7 +18,7 @@ def _tag_enumerate(docs: Iterable[list[str]]) -> list[TaggedDocument]:
     return [TaggedDocument(doc, [i]) for i, doc in enumerate(docs)]
 
 
-class ParagraphEmbedding(BaseEstimator, TransformerMixin):
+class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
     """Scikit-learn compatible Doc2Vec model."""
 
     def __init__(
@@ -186,19 +187,22 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin):
             raise NotFittedError("Model has not been fitted yet.")
         return np.array(self.model_.dv.vectors).T
 
-    def save(self, path: Union[str, Path]) -> None:
+    def to_bytes(self) -> bytes:
         if self.model_ is None:
             raise NotFittedError(
                 "Can't save model if it hasn't been fitted yet."
             )
-        with tarfile.open(path, "w:gz") as out_ball:
+        out_buffer = io.BytesIO()
+        with tarfile.open(fileobj=out_buffer, mode="w:gz") as out_ball:
             model_file = io.BytesIO()
             self.model_.save(model_file)
             out_ball.addfile(tarfile.TarInfo("doc2vec.model"), model_file)
+            return out_buffer.read()
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "ParagraphEmbedding":
-        with tarfile.open(path, "r:gz") as in_ball:
+    def from_bytes(cls, data: bytes) -> "ParagraphEmbedding":
+        in_buffer = io.BytesIO(data)
+        with tarfile.open(fileobj=in_buffer, "r:gz") as in_ball:
             names = set(in_ball.getnames())
             if names != {"doc2vec.model"}:
                 raise TypeError(
@@ -207,6 +211,7 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin):
             model_file = in_ball.extractfile("doc2vec.model")
             model = Doc2Vec.load(model_file)
             return cls.from_pretrained(model)
+
 
     @classmethod
     def from_pretrained(

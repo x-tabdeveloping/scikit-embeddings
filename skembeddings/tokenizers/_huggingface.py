@@ -16,6 +16,8 @@ from tokenizers.trainers import (
     WordPieceTrainer,
 )
 
+from skembeddings.base import Serializable
+
 
 class PretrainedHuggingFaceTokenizer(BaseEstimator, TransformerMixin):
     def __init__(self, tokenizer: Tokenizer):
@@ -42,7 +44,9 @@ class PretrainedHuggingFaceTokenizer(BaseEstimator, TransformerMixin):
         return None
 
 
-class HuggingFaceTokenizerBase(BaseEstimator, TransformerMixin, ABC):
+class HuggingFaceTokenizerBase(
+    BaseEstimator, TransformerMixin, Serializable, ABC
+):
     def __init__(self, normalizer: Normalizer = BertNormalizer()):
         self.tokenizer = None
         self.trainer = None
@@ -88,16 +92,16 @@ class HuggingFaceTokenizerBase(BaseEstimator, TransformerMixin, ABC):
     def get_feature_names_out(self, input_features=None):
         return None
 
-    def save(self, path: Union[str, Path]) -> None:
+    def to_bytes(self) -> bytes:
         if self.tokenizer is None:
             raise NotFittedError(
-                "Cannot save tokenizer as it has not been fitted yet."
+                "Tokenizer has not been fitted, cannot serialize."
             )
-        self.tokenizer.save(path)
+        return self.tokenizer.to_str().encode("utf-8")
 
     @classmethod
-    def load(cls, path: Union[str, Path]):
-        tokenizer = Tokenizer.from_file(path)
+    def from_bytes(cls, data: bytes) -> PretrainedHuggingFaceTokenizer:
+        tokenizer = Tokenizer.from_str(data.decode("utf-8"))
         return PretrainedHuggingFaceTokenizer(tokenizer)
 
 

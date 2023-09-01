@@ -9,10 +9,11 @@ from gensim.models import KeyedVectors, Word2Vec
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 
+from skembeddings.base import Serializable
 from skembeddings.streams.utils import deeplist
 
 
-class Word2VecEmbedding(BaseEstimator, TransformerMixin):
+class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
     def __init__(
         self,
         n_components: int = 100,
@@ -149,12 +150,13 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
             )
         return self.model_.wv
 
-    def save(self, path: Union[str, Path]) -> None:
+    def to_bytes(self) -> bytes:
         if self.model_ is None:
             raise NotFittedError(
                 "Can't save model if it hasn't been fitted yet."
             )
-        with tarfile.open(path, "w:gz") as out_ball:
+        out_io = io.BytesIO()
+        with tarfile.open(fileobj=out_io, mode="w:gz") as out_ball:
             model_file = io.BytesIO()
             self.model_.save(model_file)
             out_ball.addfile(tarfile.TarInfo("word2vec.model"), model_file)
@@ -163,10 +165,12 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
             conf_bytes = conf_string.encode("utf-8")
             config_file.write(conf_bytes)
             out_ball.addfile(tarfile.TarInfo("config.json"), config_file)
+            return out_io.read()
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "Word2VecEmbedding":
-        with tarfile.open(path, "r:gz") as in_ball:
+    def from_bytes(cls, data: bytes) -> "Word2VecEmbedding":
+        in_io = io.BytesIO(data)
+        with tarfile.open(fileobj=in_io, mode="r:gz") as in_ball:
             names = set(in_ball.getnames())
             if names != {"word2vec.model", "config.json"}:
                 raise TypeError(

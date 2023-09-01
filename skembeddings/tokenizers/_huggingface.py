@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterable
 
+from confection import Config, registry
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 from tokenizers import Tokenizer
@@ -17,31 +17,6 @@ from tokenizers.trainers import (
 )
 
 from skembeddings.base import Serializable
-
-
-class PretrainedHuggingFaceTokenizer(BaseEstimator, TransformerMixin):
-    def __init__(self, tokenizer: Tokenizer):
-        self.tokenizer = tokenizer
-
-    def fit(self, X: Iterable[str], y=None):
-        return self
-
-    def partial_fit(self, X: Iterable[str], y=None):
-        return self
-
-    def transform(self, X: Iterable[str]) -> list[list[str]]:
-        if isinstance(X, str):
-            raise TypeError(
-                "str passed instead of iterable, did you mean to pass [X]?"
-            )
-        res = []
-        for text in X:
-            encoding = self.tokenizer.encode(text)
-            res.append(encoding.tokens)
-        return res
-
-    def get_feature_names_out(self, input_features=None):
-        return None
 
 
 class HuggingFaceTokenizerBase(
@@ -99,10 +74,10 @@ class HuggingFaceTokenizerBase(
             )
         return self.tokenizer.to_str().encode("utf-8")
 
-    @classmethod
-    def from_bytes(cls, data: bytes) -> PretrainedHuggingFaceTokenizer:
+    def from_bytes(self, data: bytes):
         tokenizer = Tokenizer.from_str(data.decode("utf-8"))
-        return PretrainedHuggingFaceTokenizer(tokenizer)
+        self.tokenizer = tokenizer
+        return self
 
 
 class WordPieceTokenizer(HuggingFaceTokenizerBase):
@@ -115,6 +90,21 @@ class WordPieceTokenizer(HuggingFaceTokenizerBase):
     def _init_trainer(self) -> Trainer:
         return WordPieceTrainer(special_tokens=["[UNK]"])
 
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "tokenizer": {
+                    "@tokenizers": "wordpiece_tokenizer.v1",
+                }
+            }
+        )
+
+    @classmethod
+    def from_config(cls, config: Config) -> "WordPieceTokenizer":
+        resolved = registry.resolve(config)
+        return resolved["tokenizer"]
+
 
 class WordLevelTokenizer(HuggingFaceTokenizerBase):
     def _init_tokenizer(self) -> Tokenizer:
@@ -125,6 +115,21 @@ class WordLevelTokenizer(HuggingFaceTokenizerBase):
 
     def _init_trainer(self) -> Trainer:
         return WordLevelTrainer(special_tokens=["[UNK]"])
+
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "tokenizer": {
+                    "@tokenizers": "word_level_tokenizer.v1",
+                }
+            }
+        )
+
+    @classmethod
+    def from_config(cls, config: Config) -> "WordLevelTokenizer":
+        resolved = registry.resolve(config)
+        return resolved["tokenizer"]
 
 
 class UnigramTokenizer(HuggingFaceTokenizerBase):
@@ -137,6 +142,21 @@ class UnigramTokenizer(HuggingFaceTokenizerBase):
     def _init_trainer(self) -> Trainer:
         return UnigramTrainer(unk_token="[UNK]", special_tokens=["[UNK]"])
 
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "tokenizer": {
+                    "@tokenizers": "unigram_tokenizer.v1",
+                }
+            }
+        )
+
+    @classmethod
+    def from_config(cls, config: Config) -> "UnigramTokenizer":
+        resolved = registry.resolve(config)
+        return resolved["tokenizer"]
+
 
 class BPETokenizer(HuggingFaceTokenizerBase):
     def _init_tokenizer(self) -> Tokenizer:
@@ -147,3 +167,18 @@ class BPETokenizer(HuggingFaceTokenizerBase):
 
     def _init_trainer(self) -> Trainer:
         return BpeTrainer(special_tokens=["[UNK]"])
+
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "tokenizer": {
+                    "@tokenizers": "bpe_tokenizer.v1",
+                }
+            }
+        )
+
+    @classmethod
+    def from_config(cls, config: Config) -> "BPETokenizer":
+        resolved = registry.resolve(config)
+        return resolved["tokenizer"]

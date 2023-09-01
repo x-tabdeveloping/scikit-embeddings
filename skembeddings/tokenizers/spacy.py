@@ -26,6 +26,8 @@ ATTRIBUTES = {
 
 
 class SpacyTokenizer(BaseEstimator, TransformerMixin, Serializable):
+    tokenizer_type_ = "spacy_tokenizer"
+
     def __init__(
         self,
         model: Union[str, Language] = "en_core_web_sm",

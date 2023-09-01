@@ -1,9 +1,8 @@
-import io
-import tarfile
-from pathlib import Path
-from typing import Iterable, Literal, Union
+import tempfile
+from typing import Iterable, Literal
 
 import numpy as np
+from confection import Config, registry
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
@@ -192,65 +191,31 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
             raise NotFittedError(
                 "Can't save model if it hasn't been fitted yet."
             )
-        out_buffer = io.BytesIO()
-        with tarfile.open(fileobj=out_buffer, mode="w:gz") as out_ball:
-            model_file = io.BytesIO()
-            self.model_.save(model_file)
-            out_ball.addfile(tarfile.TarInfo("doc2vec.model"), model_file)
-            return out_buffer.read()
+        with tempfile.NamedTemporaryFile(prefix="gensim-model-") as tmp:
+            temporary_filepath = tmp.name
+            self.model_.save(temporary_filepath)
+            with open(temporary_filepath, "rb") as temp_buffer:
+                return temp_buffer.read()
 
-    @classmethod
-    def from_bytes(cls, data: bytes) -> "ParagraphEmbedding":
-        in_buffer = io.BytesIO(data)
-        with tarfile.open(fileobj=in_buffer, "r:gz") as in_ball:
-            names = set(in_ball.getnames())
-            if names != {"doc2vec.model"}:
-                raise TypeError(
-                    "Given path does not contain a serialized Doc2Vec model."
-                )
-            model_file = in_ball.extractfile("doc2vec.model")
-            model = Doc2Vec.load(model_file)
-            return cls.from_pretrained(model)
+    def from_bytes(self, data: bytes) -> "ParagraphEmbedding":
+        with tempfile.NamedTemporaryFile(prefix="gensim-model-") as tmp:
+            tmp.write(data)
+            model = Doc2Vec.load(tmp.name)
+            self.model_ = model
+        return self
 
-
-    @classmethod
-    def from_pretrained(
-        cls,
-        model: Union[str, Path, Doc2Vec],
-    ):
-        if isinstance(model, (str, Path)):
-            model_ = Doc2Vec.load(model)
-        elif isinstance(model, Doc2Vec):
-            model_ = model
-        else:
-            raise TypeError(
-                "Pretrained model either has to be a"
-                "path or a Doc2Vec instance."
-            )
-        if model_.dm_mean:
-            dm_agg = "mean"
-        elif model_.dm_concat:
-            dm_agg = "concat"
-        else:
-            dm_agg = "sum"
-        res = cls(
-            n_components=model_.vector_size,
-            learning_rate=model_.alpha,
-            window=model_.window,
-            sample=model_.sample,
-            random_state=model_.seed,
-            n_jobs=model_.workers,
-            min_learning_rate=model_.min_alpha,
-            algorithm="dm" if model_.dm else "dbow",
-            dm_agg=dm_agg,
-            dbow_words=bool(model_.dbow_words),
-            dm_tag_count=model_.dm_tag_count,
-            hs=bool(model_.hs),
-            negative=model_.negative,
-            ns_exponent=model_.ns_exponent,
-            epochs=model_.epochs,
-            batch_words=model_.batch_words,
-            shrink_windows=model_.shrink_windows,
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "embedding": {
+                    "@models": "paragraph_embedding.v1",
+                    **self.get_params(),
+                }
+            }
         )
-        res.model_ = model_
-        return res
+
+    @classmethod
+    def from_config(cls, config: Config) -> "ParagraphEmbedding":
+        resolved = registry.resolve(config)
+        return resolved["embedding"]

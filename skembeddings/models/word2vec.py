@@ -1,10 +1,8 @@
-import io
-import json
-import tarfile
-from pathlib import Path
-from typing import Iterable, Literal, Union
+import tempfile
+from typing import Iterable, Literal
 
 import numpy as np
+from confection import Config, registry
 from gensim.models import KeyedVectors, Word2Vec
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
@@ -155,66 +153,31 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
             raise NotFittedError(
                 "Can't save model if it hasn't been fitted yet."
             )
-        out_io = io.BytesIO()
-        with tarfile.open(fileobj=out_io, mode="w:gz") as out_ball:
-            model_file = io.BytesIO()
-            self.model_.save(model_file)
-            out_ball.addfile(tarfile.TarInfo("word2vec.model"), model_file)
-            config_file = io.BytesIO()
-            conf_string = json.dumps({"agg": self.agg})
-            conf_bytes = conf_string.encode("utf-8")
-            config_file.write(conf_bytes)
-            out_ball.addfile(tarfile.TarInfo("config.json"), config_file)
-            return out_io.read()
+        with tempfile.NamedTemporaryFile(prefix="gensim-model-") as tmp:
+            temporary_filepath = tmp.name
+            self.model_.save(temporary_filepath)
+            with open(temporary_filepath, "rb") as temp_buffer:
+                return temp_buffer.read()
 
-    @classmethod
-    def from_bytes(cls, data: bytes) -> "Word2VecEmbedding":
-        in_io = io.BytesIO(data)
-        with tarfile.open(fileobj=in_io, mode="r:gz") as in_ball:
-            names = set(in_ball.getnames())
-            if names != {"word2vec.model", "config.json"}:
-                raise TypeError(
-                    "Given path does not contain a serialized Word2Vec model."
-                )
-            model_file = in_ball.extractfile("word2vec.model")
-            model = Word2Vec.load(model_file)
-            config_file = in_ball.extractfile("config.json")
-            conf_bytes = config_file.read()  # type: ignore
-            config = json.loads(conf_bytes.decode("utf-8"))
-            return cls.from_pretrained(model, **config)
+    def from_bytes(self, data: bytes) -> "Word2VecEmbedding":
+        with tempfile.NamedTemporaryFile(prefix="gensim-model-") as tmp:
+            tmp.write(data)
+            model = Word2Vec.load(tmp.name)
+            self.model_ = model
+        return self
 
-    @classmethod
-    def from_pretrained(
-        cls,
-        model: Union[str, Path, Word2Vec],
-        agg: Literal["mean", "max", "both"] = "mean",
-    ):
-        if isinstance(model, (str, Path)):
-            model_ = Word2Vec.load(model)
-        elif isinstance(model, Word2Vec):
-            model_ = model
-        else:
-            raise TypeError(
-                "Pretrained model either has to be a"
-                "path or a Word2Vec instance."
-            )
-        res = cls(
-            n_components=model_.vector_size,
-            learning_rate=model_.alpha,
-            window=model_.window,
-            sample=model_.sample,
-            random_state=model_.seed,
-            n_jobs=model_.workers,
-            min_learning_rate=model_.min_alpha,
-            algorithm="sg" if model_.sg else "cbow",
-            hs=bool(model_.hs),
-            negative=model_.negative,
-            ns_exponent=model_.ns_exponent,
-            cbow_agg="mean" if model_.cbow_mean else "sum",
-            epochs=model_.epochs if model_.epochs is not None else 5,
-            batch_words=model_.batch_words,
-            shrink_windows=model_.shrink_windows,
-            agg=agg,
+    @property
+    def config(self) -> Config:
+        return Config(
+            {
+                "embedding": {
+                    "@models": "word2vec_embedding.v1",
+                    **self.get_params(),
+                }
+            }
         )
-        res.model_ = model_
-        return res
+
+    @classmethod
+    def from_config(cls, config: Config) -> "Word2VecEmbedding":
+        resolved = registry.resolve(config)
+        return resolved["embedding"]

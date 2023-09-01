@@ -114,7 +114,7 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin):
             except KeyError:
                 continue
         if not embeddings:
-            return np.full(self.n_features_out, np.nan)
+            return np.full((1, self.n_features_out), np.nan)
         return np.stack(embeddings)
 
     def transform(self, X: Iterable[Iterable[str]], y=None):

@@ -129,12 +129,12 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
                 embeddings[i_doc, :] = np.nan
             doc_vectors = self._collect_vectors_single(doc)
             if self.agg == "mean":
-                embeddings[i_doc, :] = np.mean(doc_vectors, axis=0)
+                embeddings[i_doc, :] = np.nanmean(doc_vectors, axis=0)
             elif self.agg == "max":
-                embeddings[i_doc, :] = np.max(doc_vectors, axis=0)
+                embeddings[i_doc, :] = np.nanmax(doc_vectors, axis=0)
             elif self.agg == "both":
-                mean_vector = np.mean(doc_vectors, axis=0)
-                max_vector = np.max(doc_vectors, axis=0)
+                mean_vector = np.nanmean(doc_vectors, axis=0)
+                max_vector = np.nanmax(doc_vectors, axis=0)
                 embeddings[i_doc, :] = np.concatenate(
                     (mean_vector, max_vector)
                 )

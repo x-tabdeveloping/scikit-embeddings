@@ -6,7 +6,6 @@ from confection import Config, registry
 from huggingface_hub import HfApi, snapshot_download
 from sklearn.pipeline import Pipeline
 
-from skembeddings import models, tokenizers
 from skembeddings._hub import DEFAULT_README
 from skembeddings.base import Serializable
 

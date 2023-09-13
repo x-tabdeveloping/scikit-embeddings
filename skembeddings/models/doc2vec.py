@@ -18,16 +18,85 @@ def _tag_enumerate(docs: Iterable[list[str]]) -> list[TaggedDocument]:
 
 
 class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
-    """Scikit-learn compatible Doc2Vec model."""
+    """Scikit-learn compatible Paragraph Embedding model.
+
+    Parameters
+    ----------
+    n_components: int, default 100
+        Desired size of the embeddings.
+    window: int, default 5
+        Window size over tokens.
+    algorithm: Literal["dm", "dbow"], default "dm"
+        Indicates whether distributed memory or distributed
+        bag of words model gets trained.
+    max_docs: int, default 100_000
+        Number of maximum documents to keep the embeddings of.
+        Tags for further documents get resolved with the specified tagging
+        scheme.
+    tagging_scheme: Literal["hash", "closest"], default "hash"
+        Specifies what tags should be assigned to new documents after
+        the number of maximum slots has been filled. "hash" hashes the document
+        and tags it with a hash mod index. "closest" assigns the tag of the
+        closest document in the model's stored embeddings.
+    random_state: int, default 0
+        Random seed so that training is reproducible.
+    negative: int, default 5
+        If > 0, negative sampling will be used,
+        the int for negative specifies how many “noise words”
+        should be drawn (usually between 5-20).
+        If set to 0, no negative sampling is used.
+    ns_exponent: float, default 0.75
+        The exponent used to shape the negative sampling distribution.
+        A value of 1.0 samples exactly in proportion to the frequencies,
+        0.0 samples all words equally, while a negative value samples
+        low-frequency words more than high-frequency words.
+        The popular default value of 0.75
+        was chosen by the original Word2Vec paper.
+    dm_agg: Literal["mean", "sum", "concat"], default "mean"
+        Specifies how context vectors should be aggregated.
+    dm_tag_count: int, default 1
+        Expected constant number of document tags per document,
+        when using dm_agg=='concat'.
+    dbow_words: bool, default False
+        When True trains word-vectors (in skip-gram fashion) simultaneous with
+        DBOW doc-vector training; When False, only trains doc-vectors (faster).
+    sample: float, default 0.001
+        The threshold for configuring which higher-frequency words are
+        randomly downsampled, useful range is (0, 1e-5).
+    hs: bool, default False
+        Indicates whether hierarchical softmax should be used.
+        If set to False and negative is nonzero, negative sampling will
+        be used as the training objective.
+    shrink_windows: bool, default True
+        When True, the effective window size is randomly sampled
+        from [1, window].
+    learning_rate: float, default 0.025
+        Learning rate for the optimizer.
+    min_learning_rate: float, default 0.0001
+        The learning rate will linearly drop to this
+        value during training.
+    n_jobs: int, default 1
+        Number of cores to use for training.
+
+    Attributes
+    ----------
+    model_: Doc2Vec
+        Underlying gensim doc2vec model.
+    loss_: list[float]
+        Loss history during training.
+    seen_docs_: int
+        Number of seen documents.
+    config: Config
+        Generated config object for model serialization.
+    """
 
     def __init__(
         self,
         n_components: int = 100,
         window: int = 5,
         algorithm: Literal["dm", "dbow"] = "dm",
-        tagging_scheme: Literal["hash", "closest"] = "hash",
         max_docs: int = 100_000,
-        epochs: int = 10,
+        tagging_scheme: Literal["hash", "closest"] = "hash",
         random_state: int = 0,
         negative: int = 5,
         ns_exponent: float = 0.75,
@@ -36,7 +105,6 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         dbow_words: bool = False,
         sample: float = 0.001,
         hs: bool = False,
-        batch_words: int = 10000,
         shrink_windows: bool = True,
         learning_rate: float = 0.025,
         min_learning_rate: float = 0.0001,
@@ -55,7 +123,6 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         self.n_jobs = n_jobs
         self.window = window
         self.tagging_scheme = tagging_scheme
-        self.epochs = epochs
         self.random_state = random_state
         self.negative = negative
         self.ns_exponent = ns_exponent
@@ -64,7 +131,6 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         self.dbow_words = dbow_words
         self.sample = sample
         self.hs = hs
-        self.batch_words = batch_words
         self.shrink_windows = shrink_windows
         self.learning_rate = learning_rate
         self.min_learning_rate = min_learning_rate
@@ -124,9 +190,8 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
             hs=int(self.hs),
             negative=self.negative,
             ns_exponent=self.ns_exponent,
-            epochs=self.epochs,
+            epochs=1,
             trim_rule=None,
-            batch_words=self.batch_words,
             compute_loss=True,
             shrink_windows=self.shrink_windows,
         )
@@ -135,7 +200,20 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         self.loss_.append(self.model_.get_latest_training_loss())  # type: ignore
 
     def fit(self, X: Iterable[Iterable[str]], y=None):
-        """Fits a new doc2vec model to the given documents."""
+        """Fits a new paragraph embedding model to the given documents.
+
+        Parameters
+        ----------
+        X: Iterable[Iterable[str]]
+            List of documents as list of tokens.
+        y: None
+            Ignored.
+
+        Returns
+        -------
+        Self
+            Fitted model.
+        """
         self.seen_docs_ = 0
         # Forcing evaluation
         X_eval: list[list[str]] = deeplist(X)
@@ -152,7 +230,20 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         return self
 
     def partial_fit(self, X: Iterable[Iterable[str]], y=None):
-        """Partially fits doc2vec model (online fitting)."""
+        """Partially fits doc2vec model (online fitting).
+
+        Parameters
+        ----------
+        X: Iterable[Iterable[str]]
+            List of documents as list of tokens.
+        y: None
+            Ignored.
+
+        Returns
+        -------
+        Self
+            Fitted model.
+        """
         # Force evaluation on iterable
         X_eval: list[list[str]] = deeplist(X)
         if self.model_ is None:
@@ -172,7 +263,18 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         return self
 
     def transform(self, X: Iterable[Iterable[str]]) -> np.ndarray:
-        """Infers vectors for all of the given documents."""
+        """Infers vectors for all of the given documents.
+
+        Parameters
+        ----------
+        X: Iterable[Iterable[str]]
+            List of documents as list of tokens.
+
+        Returns
+        -------
+        ndarray of shape (n_docs, n_components)
+            Inferred document embeddings.
+        """
         if self.model_ is None:
             raise NotFittedError(
                 "Model ha been not fitted, please fit before inference."
@@ -180,13 +282,8 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
         vectors = [self.model_.infer_vector(list(doc)) for doc in X]
         return np.stack(vectors)
 
-    @property
-    def components_(self) -> np.ndarray:
-        if self.model_ is None:
-            raise NotFittedError("Model has not been fitted yet.")
-        return np.array(self.model_.dv.vectors).T
-
     def to_bytes(self) -> bytes:
+        """Serializes model to a bytes object."""
         if self.model_ is None:
             raise NotFittedError(
                 "Can't save model if it hasn't been fitted yet."
@@ -198,6 +295,7 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
                 return temp_buffer.read()
 
     def from_bytes(self, data: bytes) -> "ParagraphEmbedding":
+        """Loads and assigns serialized model from bytes."""
         with tempfile.NamedTemporaryFile(prefix="gensim-model-") as tmp:
             tmp.write(data)
             model = Doc2Vec.load(tmp.name)
@@ -217,5 +315,6 @@ class ParagraphEmbedding(BaseEstimator, TransformerMixin, Serializable):
 
     @classmethod
     def from_config(cls, config: Config) -> "ParagraphEmbedding":
+        """Initialize model from config object."""
         resolved = registry.resolve(config)
         return resolved["embedding"]

@@ -6,63 +6,48 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from numba import njit
-from numpy.lib.stride_tricks import sliding_window_view
 from tqdm import tqdm
 
 
-@njit
-def count_freq(sequence: list[int]) -> dict[int, int]:
-    res = dict()
-    for elem in sequence:
-        if elem in res:
-            res[elem] += 1
-        else:
-            res[elem] = 1
-    return res
-
-
-# @njit(parallel=True, fastmath=True)
-# def count_cooccurrences(
-#     docs: list[np.ndarray], context_size: int
-# ) -> dict[tuple[int, int], int]:
-#     cooccurrences = dict()
-#     for doc in docs:
-#         windows = sliding_window_view(
-#             doc, window_shape=min(context_size, len(doc))
-#         )
-#         for window in windows:
-#             n_occ = count_freq(window)
-#             for w1 in n_occ:
-#                 for w2 in n_occ:
-#                     if w1 == w2:
-#                         continue
-#                     w1, w2 = min(w1, w2), max(w1, w2)
-#                     if (w1, w2) in cooccurrences:
-#                         cooccurrences[w1, w2] += n_occ[w1] * n_occ[w2]
-#                     else:
-#                         cooccurrences[w1, w2] = n_occ[w1] * n_occ[w2]
-#     return cooccurrences
+def vectorize_ragged(
+    docs: list[list[str]], vocab: dict[str, int]
+) -> tuple[np.ndarray, np.ndarray]:
+    lengths = np.zeros(len(docs), dtype=np.uint32)
+    tokens = []
+    for i_doc, doc in enumerate(docs):
+        lengths[i_doc] = len(doc)
+        for token in doc:
+            tokens.append(vocab[token])
+    return np.array(tokens, dtype=np.uint32), lengths
 
 
 @njit(fastmath=True)
 def count_cooccurrences(
-    doc: np.ndarray, context_size: int
-) -> dict[tuple[int, int], int]:
-    cooccurrences = dict()
-    windows = sliding_window_view(
-        doc, window_shape=min(context_size, len(doc))
-    )
-    for window in windows:
-        n_occ = count_freq(window)
-        for w1 in n_occ:
-            for w2 in n_occ:
-                if w1 == w2:
-                    continue
-                w1, w2 = min(w1, w2), max(w1, w2)
-                if (w1, w2) in cooccurrences:
-                    cooccurrences[w1, w2] += n_occ[w1] * n_occ[w2]
-                else:
-                    cooccurrences[w1, w2] = n_occ[w1] * n_occ[w2]
+    tokens: np.ndarray, lengths: np.ndarray, context_size: int
+) -> dict[tuple[int, int], float]:
+    cooccurrences = {(0, 0): 0.1}
+    offsets = np.cumsum(lengths)
+    i_doc = 0
+    i_context_start = 0
+    i_context_end = i_context_start + context_size * 2 + 1
+    i_target = i_context_start + context_size + 1
+    while i_context_end < len(tokens):
+        while i_context_end < offsets[i_doc]:
+            for i_context in range(i_context_start, i_context_end):
+                if i_target != i_context:
+                    target, context = tokens[i_target], tokens[i_context]
+                    distance = abs(i_target - i_context)
+                    if (target, context) in cooccurrences:
+                        cooccurrences[(target, context)] += 1 / distance
+                    else:
+                        cooccurrences[(target, context)] = 1 / distance
+            i_context_start += 1
+            i_context_end += 1
+            i_target += 1
+        i_context_start = offsets[i_doc]
+        i_context_end = i_context_start + context_size * 2 + 1
+        i_target = i_context_start + context_size + 1
+        i_doc += 1
     return cooccurrences
 
 
@@ -81,10 +66,8 @@ def forward(
     w_context = jnp.take(context_embeddings, context, axis=0)
     b_target = jnp.take(bias, target, axis=0)
     b_context = jnp.take(context_bias, context, axis=0)
-    loss = jnp.matmul(w_embedding, w_context.T)
-    loss = jnp.sum(loss, axis=1)
-    loss = loss + b_target + b_context
-    loss = jnp.square(loss - jnp.log(coocc))
+    loss = jnp.matmul(w_embedding, w_context.T).sum(axis=1)
+    loss = jnp.square(loss + b_target + b_context - jnp.log(coocc))
     weighted_coocc = jnp.clip(jnp.float_power(coocc / max_coocc, alpha), 0, 1)
     loss = jnp.mean(jnp.matmul(weighted_coocc, loss))
     return loss
@@ -121,42 +104,45 @@ class GloVeModel:
         self.context_embeddings = None
         self.bias = None
         self.context_bias = None
-        self.vocab = dict()
-        self.next_index = 0
+        self.vocab = dict({"[UNK]": 0})
+        self.next_index = 1
         self.cooccurrences = Counter()
         self.batch_size = batch_size
         self.alpha = alpha
         self.optimizer = optax.adam(learning_rate=learning_rate)
         self.loss_history = []
 
-    def tokens_to_indices(self, docs: list[list[str]]) -> list[np.ndarray]:
-        res = []
-        for doc in docs:
-            idx = [self.vocab[token] for token in doc]
-            res.append(np.array(idx, dtype=np.uint32))
-        return res
+    # def tokens_to_indices(self, docs: list[list[str]]) -> list[np.ndarray]:
+    #     res = []
+    #     for doc in docs:
+    #         idx = [self.vocab[token] for token in doc]
+    #         res.append(np.array(idx, dtype=np.uint32))
+    #     return res
 
     def update_cooccurrences(self, docs: list[list[str]]):
-        indices = self.tokens_to_indices(docs)
-        for doc in tqdm(indices, desc="Counting cooccurrences in documents."):
-            new_coocc = count_cooccurrences(doc, self.window_size)
-            self.cooccurrences.update(new_coocc)
+        tokens, lengths = vectorize_ragged(docs, self.vocab)
+        print(tokens, lengths)
+        print("Counting cooccurrences")
+        self.cooccurrences.update(
+            count_cooccurrences(tokens, lengths, self.window_size)
+        )
 
     def extend_params(self, new_vocab: list[str]):
-        new_vocab = list(new_vocab)
         if self.embeddings is None:
             self.embeddings = self.rng.normal(
-                size=(len(new_vocab), self.vector_size)
+                size=(len(new_vocab) + 1, self.vector_size)
             )
             self.context_embeddings = self.rng.normal(
-                size=(len(new_vocab), self.vector_size)
+                size=(len(new_vocab) + 1, self.vector_size)
             )
-            self.bias = self.rng.normal(size=(len(new_vocab),))
-            self.context_bias = self.rng.normal(size=(len(new_vocab),))
+            self.bias = self.rng.normal(size=(len(new_vocab) + 1,))
+            self.context_bias = self.rng.normal(size=(len(new_vocab) + 1,))
         else:
             self.embeddings = np.concatenate(
-                self.embeddings,
-                self.rng.normal(size=(len(new_vocab), self.vector_size)),
+                (
+                    self.embeddings,
+                    self.rng.normal(size=(len(new_vocab), self.vector_size)),
+                )
             )
             self.context_embeddings = np.concatenate(
                 (
@@ -176,25 +162,28 @@ class GloVeModel:
         new_tokens = set()
         for doc in docs:
             new_tokens |= set(doc)
+        novel_tokens = set()
         for token in new_tokens:
             if token not in self.vocab:
+                novel_tokens.add(token)
                 self.vocab[token] = self.next_index
                 self.next_index += 1
         if new_tokens:
-            self.extend_params(list(new_tokens))
+            self.extend_params(list(novel_tokens))
 
     def batches(self) -> Iterable[dict]:
-        all_keys = np.array(list(self.cooccurrences))
-        self.rng.shuffle(all_keys)
-        for batch_i in range(0, len(all_keys), self.batch_size):
-            keys = all_keys[batch_i : batch_i + self.batch_size]
-            coocc = [self.cooccurrences[tuple(key)] for key in keys]
-            flip = bool(self.rng.integers(2))
-            if flip:
-                keys = np.flip(keys, axis=1)
-            keys = jnp.array(keys)
+        entries = jnp.array(
+            [
+                (target, context, coocc)
+                for (target, context), coocc in self.cooccurrences.items()
+            ]
+        )
+        for batch_i in range(0, len(entries), self.batch_size):
+            batch_entries = entries[batch_i : batch_i + self.batch_size]
             yield dict(
-                target=keys[:, 0], context=keys[:, 1], coocc=jnp.array(coocc)
+                target=batch_entries[:, 0],
+                context=batch_entries[:, 1],
+                coocc=batch_entries[:, 2],
             )
 
     @property
@@ -245,7 +234,7 @@ class GloVeModel:
         for k in keys:
             if k in self.vocab:
                 indices.append(self.vocab[k])
-        indices = [self.vocab[_key] for _key in keys]
+        indices = [self.vocab.get(_key, self.vocab["[UNK]"]) for _key in keys]
         if not indices:
             return np.full((1, self.vector_size), np.nan)
         return np.array(self.embeddings)[indices]

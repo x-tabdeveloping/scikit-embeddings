@@ -19,13 +19,11 @@ tokenizers = "^0.13.0"
 confection = "^0.1.0"
 catalogue = "^2.0.8"
 huggingface-hub = "^0.16.0"
-spacy = { version = "^3.5.0", optional = true }
-gensim = { version = "^4.3.0", optional = true }
+gensim = "^4.3.0"
 glovpy = { version = "^0.1.0", optional = true }
 
 [tool.poetry.extras]
 spacy = ["spacy"]
-gensim = ["gensim"]
 glove = ["glovpy"]
 
 [build-system]

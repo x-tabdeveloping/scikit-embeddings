@@ -1,9 +1,12 @@
+import logging
 import tempfile
 from pathlib import Path
-from typing import Union
+from typing import Iterable, Union
 
 from confection import Config, registry
 from huggingface_hub import HfApi, snapshot_download
+from huggingface_hub.utils import RepositoryNotFoundError
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 
 from skembeddings._hub import DEFAULT_README
@@ -15,33 +18,19 @@ class EmbeddingPipeline(Pipeline):
         self,
         tokenizer: Serializable,
         model: Serializable,
-        frozen: bool = False,
     ):
         self.tokenizer = tokenizer
         self.model = model
-        self.frozen = frozen
         steps = [("tokenizer_model", tokenizer), ("embedding_model", model)]
         super().__init__(steps=steps)
 
-    def freeze(self):
-        self.frozen = True
-        return self
-
-    def unfreeze(self):
-        self.frozen = False
-        return self
-
     def fit(self, X, y=None, **kwargs):
-        if self.frozen:
-            return self
         super().fit(X, y=y, **kwargs)
 
     def partial_fit(self, X, y=None, classes=None, **kwargs):
         """
         Fits the components, but allow for batches.
         """
-        if self.frozen:
-            return self
         for name, step in self.steps:
             if not hasattr(step, "partial_fit"):
                 raise ValueError(
@@ -62,6 +51,13 @@ class EmbeddingPipeline(Pipeline):
         embedding: Serializable = self["embedding_model"]  # type: ignore
         tokenizer: Serializable = self["tokenizer_model"]  # type: ignore
         return tokenizer.config.merge(embedding.config)
+
+    @classmethod
+    def from_config(cls, config: Config) -> "EmbeddingPipeline":
+        resolved = registry.resolve(config)
+        tokenizer = resolved["tokenizer"]
+        model = resolved["embedding"]
+        return cls(model, tokenizer)
 
     def to_disk(self, path: Union[str, Path]) -> None:
         embedding: Serializable = self["embedding_model"]  # type: ignore
@@ -109,4 +105,24 @@ class EmbeddingPipeline(Pipeline):
     def from_hub(cls, repo_id: str) -> "EmbeddingPipeline":
         in_dir = snapshot_download(repo_id=repo_id)
         res = cls.from_disk(in_dir)
-        return res.freeze()
+        return res
+
+
+class PretrainedPipeline(TransformerMixin, BaseEstimator):
+    def __init__(self, name: str):
+        self.name = name
+        try:
+            self.pipeline_ = EmbeddingPipeline.from_hub(name)
+        except RepositoryNotFoundError:
+            logging.info("Repo not found trying to load form disk.")
+            self.pipeline_ = EmbeddingPipeline.from_disk(name)
+        except FileNotFoundError as e:
+            raise ValueError(
+                "Given repository does not contain an skembeddings pipeline."
+            ) from e
+
+    def fit(self, X: Iterable[str], y=None):
+        return self
+
+    def transform(self, X: Iterable[str]):
+        return self.pipeline_.transform(X)

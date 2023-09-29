@@ -76,6 +76,7 @@ class GloVeEmbedding(BaseEstimator, TransformerMixin, Serializable):
         for doc in X:
             if not len(doc):
                 embeddings.append(np.full(self.n_features_out, np.nan))
+                continue
             doc_vectors = self._collect_vectors_single(doc)
             if self.agg == "mean":
                 embeddings.append(np.nanmean(doc_vectors, axis=0))
@@ -104,6 +105,7 @@ class GloVeEmbedding(BaseEstimator, TransformerMixin, Serializable):
             keyed_vectors = KeyedVectors.load(tmp.name)
             self.model_ = GloVe()
             self.model_.wv = keyed_vectors
+        return self
 
     @property
     def config(self) -> Config:

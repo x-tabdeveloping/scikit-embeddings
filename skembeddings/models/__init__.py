@@ -3,16 +3,8 @@ from typing import Literal
 from confection import registry
 
 from skembeddings.error import NotInstalled
-
-try:
-    from skembeddings.models.word2vec import Word2VecEmbedding
-except ModuleNotFoundError:
-    Word2VecEmbedding = NotInstalled("Word2VecEmbedding", "gensim")
-
-try:
-    from skembeddings.models.doc2vec import ParagraphEmbedding
-except ModuleNotFoundError:
-    ParagraphEmbedding = NotInstalled("ParagraphEmbedding", "gensim")
+from skembeddings.models.doc2vec import ParagraphEmbedding
+from skembeddings.models.word2vec import Word2VecEmbedding
 
 try:
     from skembeddings.models.glove import GloVeEmbedding
@@ -23,7 +15,7 @@ except ModuleNotFoundError:
 @registry.models.register("glove_embedding.v1")
 def make_glove_embedding(
     n_components: int = 100,
-    agg: Literal["mean", "max", "both"] = "mean",
+    agg: str = "mean",
     alpha: float = 0.75,
     window: int = 15,
     symmetric: bool = True,
@@ -51,8 +43,8 @@ def make_glove_embedding(
 def make_word2vec_embedding(
     n_components: int = 100,
     window: int = 5,
-    algorithm: Literal["cbow", "sg"] = "cbow",
-    agg: Literal["mean", "max", "both"] = "mean",
+    algorithm: str = "cbow",
+    agg: str = "mean",
     epochs: int = 5,
     random_state: int = 0,
     negative: int = 5,
@@ -90,14 +82,14 @@ def make_word2vec_embedding(
 def make_paragraph_embedding(
     n_components: int = 100,
     window: int = 5,
-    algorithm: Literal["dm", "dbow"] = "dm",
-    tagging_scheme: Literal["hash", "closest"] = "hash",
+    algorithm: str = "dm",
+    tagging_scheme: str = "hash",
     max_docs: int = 100_000,
     epochs: int = 10,
     random_state: int = 0,
     negative: int = 5,
     ns_exponent: float = 0.75,
-    dm_agg: Literal["mean", "sum", "concat"] = "mean",
+    dm_agg: str = "mean",
     dm_tag_count: int = 1,
     dbow_words: bool = False,
     sample: float = 0.001,

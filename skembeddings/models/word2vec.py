@@ -8,7 +8,6 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 
 from skembeddings.base import Serializable
-from skembeddings.streams.utils import deeplist
 
 
 class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
@@ -103,10 +102,14 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
         self.shrink_windows = shrink_windows
         self.epochs = epochs
         self.model_ = None
-        self.loss_: list[float] = []
         self.n_features_out = (
             self.n_components if agg != "both" else self.n_components * 2
         )
+        agg_options = ["mean", "max", "both"]
+        if self.agg not in agg_options:
+            raise ValueError(
+                f"The `agg` value must be in {agg_options}. Got {self.agg}."
+            )
 
     def _init_model(self, sentences=None) -> Word2Vec:
         return Word2Vec(
@@ -131,36 +134,10 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
             shrink_windows=self.shrink_windows,
         )
 
-    def fit(self, X: Iterable[Iterable[str]], y=None):
-        self._check_inputs(X)
-        X = deeplist(X)
+    def fit(self, X: Iterable[list[str]], y=None):
         self.loss_ = []
         self.model_ = self._init_model(sentences=X)
-        self.loss_.append(self.model_.get_latest_training_loss())
         return self
-
-    def partial_fit(self, X: Iterable[Iterable[str]], y=None):
-        self._check_inputs(X)
-        X = deeplist(X)
-        if self.model_ is None:
-            self.fit(X, y)
-        else:
-            self.model_.build_vocab(X, update=True)
-            self.model_.train(
-                X,
-                total_examples=self.model_.corpus_count,
-                epochs=self.model_.epochs,
-                comput_loss=True,
-            )
-            self.loss_.append(self.model_.get_latest_training_loss())
-        return self
-
-    def _check_inputs(self, X):
-        options = ["mean", "max", "both"]
-        if self.agg not in options:
-            raise ValueError(
-                f"The `agg` value must be in {options}. Got {self.agg}."
-            )
 
     def _collect_vectors_single(self, tokens: list[str]) -> np.ndarray:
         embeddings = []
@@ -173,27 +150,25 @@ class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
             return np.full((1, self.n_features_out), np.nan)
         return np.stack(embeddings)
 
-    def transform(self, X: Iterable[Iterable[str]], y=None):
+    def transform(self, X: Iterable[list[str]], y=None):
         """Transforms the phrase text into a numeric
         representation using word embeddings."""
-        self._check_inputs(X)
-        X: list[list[str]] = deeplist(X)
-        embeddings = np.empty((len(X), self.n_features_out))
-        for i_doc, doc in enumerate(X):
+        if self.model_ is None:
+            raise NotFittedError("Model has not been fitted yet.")
+        embeddings = []
+        for doc in X:
             if not len(doc):
-                embeddings[i_doc, :] = np.nan
+                embeddings.append(np.full(self.n_features_out, np.nan))
             doc_vectors = self._collect_vectors_single(doc)
             if self.agg == "mean":
-                embeddings[i_doc, :] = np.nanmean(doc_vectors, axis=0)
+                embeddings.append(np.nanmean(doc_vectors, axis=0))
             elif self.agg == "max":
-                embeddings[i_doc, :] = np.nanmax(doc_vectors, axis=0)
+                embeddings.append(np.nanmax(doc_vectors, axis=0))
             elif self.agg == "both":
                 mean_vector = np.nanmean(doc_vectors, axis=0)
                 max_vector = np.nanmax(doc_vectors, axis=0)
-                embeddings[i_doc, :] = np.concatenate(
-                    (mean_vector, max_vector)
-                )
-        return embeddings
+                embeddings.append(np.concatenate((mean_vector, max_vector)))
+        return np.stack(embeddings)
 
     @property
     def keyed_vectors(self) -> KeyedVectors:

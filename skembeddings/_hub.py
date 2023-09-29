@@ -16,9 +16,9 @@ This repository contains an embedding pipeline that has been trained using [scik
 ```python
 # pip install scikit-embeddings
 
-from skembeddings.pipeline import EmbeddingPipeline
+from skembeddings.pipeline import PretrainedPipeline
 
-pipe = EmbeddingPipeline.from_hub('{repo}')
+pipe = PretrainedPipeline('{repo}')
 
 pipe.transform(["A text you intend to vectorize."])
 ```

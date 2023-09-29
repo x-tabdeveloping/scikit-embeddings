@@ -14,6 +14,38 @@ try:
 except ModuleNotFoundError:
     ParagraphEmbedding = NotInstalled("ParagraphEmbedding", "gensim")
 
+try:
+    from skembeddings.models.glove import GloVeEmbedding
+except ModuleNotFoundError:
+    ParagraphEmbedding = NotInstalled("GloVeEmbedding", "glove")
+
+
+@registry.models.register("glove_embedding.v1")
+def make_glove_embedding(
+    n_components: int = 100,
+    agg: Literal["mean", "max", "both"] = "mean",
+    alpha: float = 0.75,
+    window: int = 15,
+    symmetric: bool = True,
+    distance_weighting: bool = True,
+    iter: int = 25,
+    initial_learning_rate: float = 0.05,
+    n_jobs: int = 8,
+    memory: float = 4.0,
+):
+    return GloVeEmbedding(
+        n_components=n_components,
+        agg=agg,
+        alpha=alpha,
+        window=window,
+        symmetric=symmetric,
+        distance_weighting=distance_weighting,
+        iter=iter,
+        initial_learning_rate=initial_learning_rate,
+        n_jobs=n_jobs,
+        memory=memory,
+    )
+
 
 @registry.models.register("word2vec_embedding.v1")
 def make_word2vec_embedding(

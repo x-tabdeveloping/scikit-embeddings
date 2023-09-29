@@ -12,6 +12,61 @@ from skembeddings.streams.utils import deeplist
 
 
 class Word2VecEmbedding(BaseEstimator, TransformerMixin, Serializable):
+    """Scikit-learn compatible Word2Vec embedding component.
+
+    Parameters
+    ----------
+    n_components: int, default 100
+        Desired size of the embeddings.
+    window: int, default 5
+        Window size over tokens.
+    algorithm: Literal["cbow", "sg"], default "cbow"
+        Indicates whether a continuous bag-of-words or
+        skip-gram model should be trained.
+    agg: Literal["mean", "max", "both"], default "mean"
+        Indicates how output words should be aggregated when inferring
+        embeddings for input documents.
+    epochs: int, default 5
+        Number of training epochs to run.
+    random_state: int, default 0
+        Random seed for reproducible results.
+    negative: int, default 5
+        If > 0, negative sampling will be used,
+        the int for negative specifies how many “noise words”
+        should be drawn (usually between 5-20).
+        If set to 0, no negative sampling is used.
+    ns_exponent: float, default 0.75
+        The exponent used to shape the negative sampling distribution.
+        A value of 1.0 samples exactly in proportion to the frequencies,
+        0.0 samples all words equally, while a negative value samples
+        low-frequency words more than high-frequency words.
+        The popular default value of 0.75
+        was chosen by the original Word2Vec paper.
+    cbow_agg: Literal["mean", "sum"], default "mean"
+        Indicates how context words should be aggregated when using
+        CBOW.
+    sample: float, default 0.001
+        The threshold for configuring which higher-frequency words are
+        randomly downsampled, useful range is (0, 1e-5).
+    hs: bool, default False
+        Indicates whether hierarchical softmax should be used.
+        If set to False and negative is nonzero, negative sampling will
+        be used as the training objective.
+    batch_words: int, default 10000
+        Target size (in words) for batches of
+        examples passed to worker threads.
+    shrink_windows: bool, default True
+        When True, the effective window size is randomly sampled
+        from [1, window].
+    learning_rate: float, default 0.025
+        Learning rate for the optimizer.
+    min_learning_rate: float, default 0.0001
+        The learning rate will linearly drop to this
+        value during training.
+    n_jobs: int, default 1
+        Number of cores to use for training.
+    """
+
     def __init__(
         self,
         n_components: int = 100,

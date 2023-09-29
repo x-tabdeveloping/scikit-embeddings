@@ -9,7 +9,25 @@ from sklearn.exceptions import NotFittedError
 from sklearn.utils import murmurhash3_32
 
 from skembeddings.base import Serializable
-from skembeddings.streams.utils import deeplist
+
+
+def deeplist(nested) -> list:
+    """Recursively turns nested iterable to list.
+
+    Parameters
+    ----------
+    nested: iterable
+        Nested iterable.
+
+    Returns
+    -------
+    list
+        Nested list.
+    """
+    if not isinstance(nested, Iterable) or isinstance(nested, str):
+        return nested  # type: ignore
+    else:
+        return [deeplist(sub) for sub in nested]
 
 
 def _tag_enumerate(docs: Iterable[list[str]]) -> list[TaggedDocument]:

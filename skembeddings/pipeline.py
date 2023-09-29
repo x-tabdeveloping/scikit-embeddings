@@ -15,33 +15,19 @@ class EmbeddingPipeline(Pipeline):
         self,
         tokenizer: Serializable,
         model: Serializable,
-        frozen: bool = False,
     ):
         self.tokenizer = tokenizer
         self.model = model
-        self.frozen = frozen
         steps = [("tokenizer_model", tokenizer), ("embedding_model", model)]
         super().__init__(steps=steps)
 
-    def freeze(self):
-        self.frozen = True
-        return self
-
-    def unfreeze(self):
-        self.frozen = False
-        return self
-
     def fit(self, X, y=None, **kwargs):
-        if self.frozen:
-            return self
         super().fit(X, y=y, **kwargs)
 
     def partial_fit(self, X, y=None, classes=None, **kwargs):
         """
         Fits the components, but allow for batches.
         """
-        if self.frozen:
-            return self
         for name, step in self.steps:
             if not hasattr(step, "partial_fit"):
                 raise ValueError(
@@ -62,6 +48,13 @@ class EmbeddingPipeline(Pipeline):
         embedding: Serializable = self["embedding_model"]  # type: ignore
         tokenizer: Serializable = self["tokenizer_model"]  # type: ignore
         return tokenizer.config.merge(embedding.config)
+
+    @classmethod
+    def from_config(cls, config: Config) -> "EmbeddingPipeline":
+        resolved = registry.resolve(config)
+        tokenizer = resolved["tokenizer"]
+        model = resolved["embedding"]
+        return cls(model, tokenizer)
 
     def to_disk(self, path: Union[str, Path]) -> None:
         embedding: Serializable = self["embedding_model"]  # type: ignore

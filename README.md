@@ -74,7 +74,7 @@ You can train Doc2Vec paragpraph embeddings with the chosen choice of tokenizati
 ```python
 from skembedding.tokenizers import WordPieceTokenizer
 from skembedding.models import ParagraphEmbedding
-from skembeddings.pipeline import EmbeddingPipeline
+from skembeddings.pipeline import EmbeddingPipeline, PretrainedPipeline
 
 embedding_pipe = EmbeddingPipeline(
     WordPieceTokenizer(),
@@ -90,7 +90,7 @@ Pipelines can be safely serialized to disk:
 ```python
 embedding_pipe.to_disk("output_folder/")
 
-embedding_pipe = EmbeddingPipeline.from_disk("output_folder/")
+pretrained = PretrainedPipeline("output_folder/")
 ```
 
 Or published to HugginFace Hub:
@@ -101,7 +101,7 @@ from huggingface_hub import login
 login()
 embedding_pipe.to_hub("username/name_of_pipeline")
 
-embedding_pipe = EmbeddingPipeline.from_hub("username/name_of_pipeline")
+pretrained = PretrainedPipeline("username/name_of_pipeline")
 ```
 
 ## Text Classification
@@ -115,7 +115,7 @@ from sklearn.metrics import classification_report
 
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 
-cls_pipe = make_pipeline(embedding_pipe, LogisticRegression())
+cls_pipe = make_pipeline(pretrained, LogisticRegression())
 cls_pipe.fit(X_train, y_train)
 
 y_pred = cls_pipe.predict(X_test)

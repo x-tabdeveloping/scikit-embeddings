@@ -6,7 +6,7 @@ name = "scikit-embeddings"
 packages = [
   {include = "skembeddings"}
 ]
-version = "0.3.0"
+version = "0.3.1"
 description = "Tools for training word and document embeddings in scikit-learn."
 authors = ["Márton Kardos <power.up1163@gmail.com>"]
 license = "MIT"

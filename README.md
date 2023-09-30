@@ -5,6 +5,11 @@
 <br>
 Utilites for training, storing and using word and document embeddings in scikit-learn pipelines.
 
+## WARNING: DO NOT USE THIS REPO FOR ANYTHING SERIOUS
+This was a stupid experiment, and I will almost definitely phase it out in favour of [yasep](https://github.com/x-tabdeveloping/yasep). Please do not rely on this repo for your projects.
+
+Love, Marton <3
+
 ## Features
  - Train Word and Paragraph embeddings in scikit-learn compatible pipelines.
  - Fast and performant trainable tokenizer components from `tokenizers`.
